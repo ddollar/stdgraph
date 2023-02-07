@@ -16,7 +16,7 @@ import (
 
 type ContextGeneratorFunc func(context.Context, *http.Request) (context.Context, error)
 
-type Graph struct {
+type Handler struct {
 	ContextGenerator ContextGeneratorFunc
 	Trace            bool
 	handler          http.Handler
@@ -26,8 +26,8 @@ type stackTracer interface {
 	StackTrace() errors.StackTrace
 }
 
-func New(schema string, resolver any) (*Graph, error) {
-	g := &Graph{}
+func NewHandler(schema string, resolver any) (*Handler, error) {
+	g := &Handler{}
 
 	s, err := graphql.ParseSchema(schema, resolver, graphql.ErrorExtensioner(g.errorTracer))
 	if err != nil {
@@ -39,21 +39,21 @@ func New(schema string, resolver any) (*Graph, error) {
 	return g, nil
 }
 
-func (g *Graph) BuildContext(ctx context.Context, r *http.Request) (context.Context, error) {
-	if g.ContextGenerator == nil {
+func (h *Handler) BuildContext(ctx context.Context, r *http.Request) (context.Context, error) {
+	if h.ContextGenerator == nil {
 		return ctx, nil
 	}
 
-	return g.ContextGenerator(ctx, r)
+	return h.ContextGenerator(ctx, r)
 }
 
-func (g *Graph) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	h, ok := g.handler.(http.Hijacker)
+func (h *Handler) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := h.handler.(http.Hijacker)
 	if !ok {
 		return nil, nil, errors.New("hijack not supported")
 	}
 
-	c, rw, err := h.Hijack()
+	c, rw, err := hj.Hijack()
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
@@ -61,14 +61,14 @@ func (g *Graph) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return c, rw, nil
 }
 
-func (g *Graph) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Origin")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
 	switch r.Method {
 	case "GET", "POST":
-		g.handler.ServeHTTP(w, r)
+		h.handler.ServeHTTP(w, r)
 	case "OPTIONS":
 		fmt.Fprintf(w, "ok\n")
 	default:
@@ -76,8 +76,8 @@ func (g *Graph) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (g *Graph) errorTracer(err error) map[string]interface{} {
-	if g.Trace {
+func (h *Handler) errorTracer(err error) map[string]interface{} {
+	if h.Trace {
 		if st, ok := err.(stackTracer); ok {
 			return map[string]interface{}{
 				"stacktrace": st.StackTrace(),
