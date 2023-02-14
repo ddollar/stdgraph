@@ -22,9 +22,13 @@ type Handler struct {
 	handler          http.Handler
 }
 
+type contextKey string
+
 type stackTracer interface {
 	StackTrace() errors.StackTrace
 }
+
+var contextAuthorization = contextKey("authorization")
 
 func NewHandler(schema string, resolver any) (*Handler, error) {
 	g := &Handler{}
@@ -34,12 +38,22 @@ func NewHandler(schema string, resolver any) (*Handler, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	g.handler = graphqlws.NewHandlerFunc(s, &relay.Handler{Schema: s}, graphqlws.WithContextGenerator(g)) // support http fallback
+	g.handler = graphqlws.NewHandlerFunc(s, &relay.Handler{Schema: s}, graphqlws.WithContextGenerator(g))
 
 	return g, nil
 }
 
+func Authorization(ctx context.Context) string {
+	if v, ok := ctx.Value(contextAuthorization).(string); ok {
+		return v
+	} else {
+		return ""
+	}
+}
+
 func (h *Handler) BuildContext(ctx context.Context, r *http.Request) (context.Context, error) {
+	ctx = context.WithValue(ctx, contextAuthorization, r.Header.Get("Authorization"))
+
 	if h.ContextGenerator == nil {
 		return ctx, nil
 	}
