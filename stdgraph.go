@@ -1,26 +1,24 @@
 package stdgraph
 
 import (
-	"bufio"
 	"context"
 	_ "embed" // embed
 	"fmt"
-	"net"
 	"net/http"
+	"strings"
 
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
-	"github.com/graph-gophers/graphql-transport-ws/graphqlws"
 	"github.com/pkg/errors"
 )
 
-type ContextGeneratorFunc func(context.Context, *http.Request) (context.Context, error)
-
 type Handler struct {
-	ContextGenerator ContextGeneratorFunc
-	Trace            bool
-	handler          http.Handler
+	Trace      bool
+	handler    http.Handler
+	middleware []MiddlewareFunc
 }
+
+type MiddlewareFunc func(ctx context.Context, r *http.Request) (context.Context, error)
 
 type contextKey string
 
@@ -30,55 +28,53 @@ type stackTracer interface {
 
 var contextAuthorization = contextKey("authorization")
 
+func Authorization(ctx context.Context, kind string) string {
+	prefix := fmt.Sprintf("%s ", kind)
+
+	if v, ok := ctx.Value(contextAuthorization).(string); ok && strings.HasPrefix(v, prefix) {
+		return v[len(prefix):]
+	} else {
+		return ""
+	}
+}
+
 func NewHandler(schema string, resolver any) (*Handler, error) {
-	g := &Handler{}
+	g := &Handler{
+		middleware: []MiddlewareFunc{},
+	}
 
 	s, err := graphql.ParseSchema(schema, resolver, graphql.ErrorExtensioner(g.errorTracer))
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	g.handler = graphqlws.NewHandlerFunc(s, &relay.Handler{Schema: s}, graphqlws.WithContextGenerator(g))
+	g.handler = &relay.Handler{Schema: s}
 
 	return g, nil
-}
-
-func Authorization(ctx context.Context) string {
-	if v, ok := ctx.Value(contextAuthorization).(string); ok {
-		return v
-	} else {
-		return ""
-	}
-}
-
-func (h *Handler) BuildContext(ctx context.Context, r *http.Request) (context.Context, error) {
-	ctx = context.WithValue(ctx, contextAuthorization, r.Header.Get("Authorization"))
-
-	if h.ContextGenerator == nil {
-		return ctx, nil
-	}
-
-	return h.ContextGenerator(ctx, r)
-}
-
-func (h *Handler) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hj, ok := h.handler.(http.Hijacker)
-	if !ok {
-		return nil, nil, errors.New("hijack not supported")
-	}
-
-	c, rw, err := hj.Hijack()
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	return c, rw, nil
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Origin")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+
+	ctx := context.WithValue(r.Context(), contextAuthorization, r.Header.Get("Authorization"))
+
+	for _, fn := range h.middleware {
+		c, err := fn(ctx, r)
+		switch et := err.(type) {
+		case Error:
+			http.Error(w, et.Error(), et.Code())
+			return
+		case error:
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		ctx = c
+	}
+
+	r = r.WithContext(ctx)
 
 	switch r.Method {
 	case "GET", "POST":
@@ -88,6 +84,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func (h *Handler) Use(fn MiddlewareFunc) {
+	h.middleware = append(h.middleware, fn)
 }
 
 func (h *Handler) errorTracer(err error) map[string]interface{} {
