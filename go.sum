@@ -1,6 +1,6 @@
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/ddollar/graphql-go v1.4.0-ddollar h1:gk57Ja07aLWErvGGXVDTPk1gowoBzLDF/2P1aN1oDts=
-github.com/ddollar/graphql-go v1.4.0-ddollar/go.mod h1:YtmJZDLbF1YYNrlNAuiO5zAStUWc3XZT07iGsVqe1Os=
+github.com/ddollar/graphql-go v1.5.0-ddollar2 h1:LQTaqSLGlErVjFNRWxVozOm3f/l0/K6Gj+gZt5lYyJo=
+github.com/ddollar/graphql-go v1.5.0-ddollar2/go.mod h1:QchJG++OsnVdcmOngVIWUVIEufmuJEw2UpPMGk37K04=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.2.3/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/stdr v1.2.2/go.mod h1:mMo/vtBO5dYbehREoey6XUKy/eSumjCCveDpRre4VKE=

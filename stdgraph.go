@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/graph-gophers/graphql-go"
-	"github.com/graph-gophers/graphql-go/relay"
+	"github.com/ddollar/graphql-go"
+	"github.com/ddollar/graphql-go/relay"
 	"github.com/pkg/errors"
 )
 
