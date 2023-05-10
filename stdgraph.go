@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ddollar/graphql-go"
 	"github.com/ddollar/graphql-go/relay"
+	"github.com/ddollar/graphql-transport-ws/graphqlws"
 	"github.com/pkg/errors"
 )
 
@@ -48,7 +50,9 @@ func NewHandler(schema string, resolver any) (*Handler, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	g.handler = &relay.Handler{Schema: s}
+	opts := graphqlws.WithWriteTimeout(10 * time.Second)
+
+	g.handler = graphqlws.NewHandlerFunc(s, &relay.Handler{Schema: s}, opts)
 
 	return g, nil
 }
