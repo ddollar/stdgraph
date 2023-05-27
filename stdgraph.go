@@ -40,7 +40,7 @@ func Authorization(ctx context.Context, kind string) string {
 	}
 }
 
-func NewHandler(schema string, resolver any) (*Handler, error) {
+func NewHandler(schema string, resolver any, opts ...graphqlws.Option) (*Handler, error) {
 	g := &Handler{
 		middleware: []MiddlewareFunc{},
 	}
@@ -50,9 +50,11 @@ func NewHandler(schema string, resolver any) (*Handler, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	opts := graphqlws.WithWriteTimeout(10 * time.Second)
+	defaults := []graphqlws.Option{
+		graphqlws.WithWriteTimeout(10 * time.Second),
+	}
 
-	g.handler = graphqlws.NewHandlerFunc(s, &relay.Handler{Schema: s}, opts)
+	g.handler = graphqlws.NewHandlerFunc(s, &relay.Handler{Schema: s}, append(defaults, opts...)...)
 
 	return g, nil
 }
