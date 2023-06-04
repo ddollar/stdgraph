@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ddollar/graphql-go"
-	"github.com/ddollar/graphql-go/relay"
 	"github.com/ddollar/graphql-transport-ws/graphqlws"
+	"github.com/graph-gophers/graphql-go"
+	"github.com/graph-gophers/graphql-go/relay"
 	"github.com/pkg/errors"
 )
 
@@ -23,10 +23,6 @@ type Handler struct {
 type MiddlewareFunc func(ctx context.Context, r *http.Request) (context.Context, error)
 
 type contextKey string
-
-type stackTracer interface {
-	StackTrace() errors.StackTrace
-}
 
 var contextAuthorization = contextKey("authorization")
 
@@ -45,7 +41,7 @@ func NewHandler(schema string, resolver any, opts ...graphqlws.Option) (*Handler
 		middleware: []MiddlewareFunc{},
 	}
 
-	s, err := graphql.ParseSchema(schema, resolver, graphql.ErrorExtensioner(g.errorTracer))
+	s, err := graphql.ParseSchema(schema, resolver)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -94,16 +90,4 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Use(fn MiddlewareFunc) {
 	h.middleware = append(h.middleware, fn)
-}
-
-func (h *Handler) errorTracer(err error) map[string]interface{} {
-	if h.Trace {
-		if st, ok := err.(stackTracer); ok {
-			return map[string]interface{}{
-				"stacktrace": st.StackTrace(),
-			}
-		}
-	}
-
-	return nil
 }
